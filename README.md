@@ -1,5 +1,7 @@
 # Antescher
 
+▶ **Play it now: <https://flounder1664.github.io/AntAttack/>**
+
 A browser-based clone of Sandy White's *Ant Attack* (Quicksilva, ZX Spectrum,
 1983) — one of the first isometric 3D games ever made.
 
