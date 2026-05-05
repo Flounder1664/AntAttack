@@ -6,9 +6,9 @@
 
 import { palette } from "./themes.js";
 
-export const TILE_W = 120;    // top-face horizontal extent
-export const TILE_H = 60;     // top-face vertical extent (half of W → 2:1 dimetric)
-export const TILE_Z = 60;     // pixel height of one unit cube on screen
+export const TILE_W = 160;    // top-face horizontal extent
+export const TILE_H = 80;     // top-face vertical extent (half of W → 2:1 dimetric)
+export const TILE_Z = 80;     // pixel height of one unit cube on screen
 
 // Stipple (halftone) patterns for the monochrome Spectrum theme.
 // Built once per context; light = ~25% black dots, heavy = 50% checker.
@@ -337,11 +337,14 @@ export function drawAnt(ctx, sx, sy, frame = 0, opts = {}) {
   const p = palette();
 
   if (legacy) {
-    // ── Pixel-art ant (faithful to the 1983 original) ─────────────────────
-    // Three rounded body segments arranged left → right with corner pixels
-    // shaved to suggest curvature. Six legs splay out top and bottom; long
-    // antennae and forward-pointing mandibles at the head end. A 2-frame
-    // walk wiggles legs alternately top/bottom for that scuttling look.
+    // ── Pixel-art ant ─────────────────────────────────────────────────────
+    // Anatomy laid out left→right (rear→front) with proper ant features:
+    //   abdomen — 4u rounded oval, sits at the back
+    //   petiole — 1u "waist" pinch between abdomen and thorax
+    //   thorax  — 3u wide, six bent legs attach here in three pairs
+    //   neck    — 1u link
+    //   head    — 3u rounded with red eyes and forked mandibles
+    //   antennae— two elbowed segments rising and bending forward
     const u = Math.max(2, Math.round(TILE_W / 30));
     const bx = Math.round(sx / u) * u;
     const by = Math.round(sy / u) * u;
@@ -349,43 +352,56 @@ export function drawAnt(ctx, sx, sy, frame = 0, opts = {}) {
 
     ctx.fillStyle = p.ant;
 
-    // Abdomen — 4u × 4u rounded (clip corners) at the rear (left).
-    ctx.fillRect(bx - 8 * u, by - 4 * u, 4 * u, 3 * u);
-    ctx.fillRect(bx - 7 * u, by - 5 * u, 2 * u, 1 * u);  // top curve
-    ctx.fillRect(bx - 7 * u, by - 1 * u, 2 * u, 1 * u);  // bottom curve
+    // Abdomen — 4u wide × 4u tall, corners shaved for an oval silhouette.
+    ctx.fillRect(bx - 9 * u, by - 4 * u, 4 * u, 4 * u);   // main body
+    ctx.fillRect(bx - 8 * u, by - 5 * u, 2 * u, 1 * u);   // top curve
+    ctx.fillRect(bx - 8 * u, by + 0 * u, 2 * u, 1 * u);   // bottom curve
+    ctx.fillRect(bx - 10 * u, by - 3 * u, 1 * u, 2 * u);  // tapered tail
 
-    // Thorax — 2u × 3u in the middle.
-    ctx.fillRect(bx - 4 * u, by - 4 * u, 2 * u, 3 * u);
+    // Petiole — single-pixel pinch between abdomen and thorax.
+    ctx.fillRect(bx - 5 * u, by - 2 * u, 1 * u, 1 * u);
 
-    // Head — 3u × 3u with shaved corners.
-    ctx.fillRect(bx - 2 * u, by - 4 * u, 3 * u, 3 * u);
-    ctx.fillRect(bx - 1 * u, by - 5 * u, 2 * u, 1 * u);  // crown
+    // Thorax — 3u wide × 3u tall (legs attach here).
+    ctx.fillRect(bx - 4 * u, by - 3 * u, 3 * u, 3 * u);
 
-    // Mandibles — two 1u tips poking forward.
-    ctx.fillRect(bx + 1 * u, by - 4 * u, 1 * u, 1 * u);
-    ctx.fillRect(bx + 1 * u, by - 2 * u, 1 * u, 1 * u);
+    // Neck — 1u link to the head.
+    ctx.fillRect(bx - 1 * u, by - 2 * u, 1 * u, 1 * u);
 
-    // Antennae — diagonal 1u dots above the head.
-    ctx.fillRect(bx,         by - 6 * u, 1 * u, 1 * u);
-    ctx.fillRect(bx + 1 * u, by - 7 * u, 1 * u, 1 * u);
+    // Head — 3u wide × 3u tall, top corners shaved for roundness.
+    ctx.fillRect(bx,         by - 3 * u, 3 * u, 3 * u);
+    ctx.fillRect(bx + 1 * u, by - 4 * u, 1 * u, 1 * u);   // crown
 
-    // Six legs (3 pairs along the thorax) — wiggle alternating frame.
+    // Forked mandibles — two 1u prongs at the front.
+    ctx.fillRect(bx + 3 * u, by - 3 * u, 1 * u, 1 * u);
+    ctx.fillRect(bx + 3 * u, by - 1 * u, 1 * u, 1 * u);
+
+    // Antennae — two elbowed pairs rising from the top of the head and
+    // bending forward at the elbow. Distinctive ant feature.
+    // Left antenna
+    ctx.fillRect(bx,         by - 4 * u, 1 * u, 1 * u);   // base
+    ctx.fillRect(bx,         by - 5 * u, 1 * u, 1 * u);   // first segment up
+    ctx.fillRect(bx + 1 * u, by - 6 * u, 1 * u, 1 * u);   // elbow + tip forward
+    // Right antenna
+    ctx.fillRect(bx + 2 * u, by - 4 * u, 1 * u, 1 * u);   // base
+    ctx.fillRect(bx + 2 * u, by - 5 * u, 1 * u, 1 * u);   // first segment up
+    ctx.fillRect(bx + 3 * u, by - 6 * u, 1 * u, 1 * u);   // elbow + tip forward
+
+    // Six legs (3 pairs from thorax) — bent insect legs that wiggle.
     for (let i = 0; i < 3; i++) {
-      const lx = bx - 7 * u + i * 2 * u;
+      const lx = bx - 4 * u + i * 1 * u;          // attach along thorax
       const upWig = ((i + w) & 1) ? u : 0;
       const dnWig = ((i + w) & 1) ? 0 : u;
-      // Top legs reach up-and-out
-      ctx.fillRect(lx, by - 5 * u, 1 * u, 1 * u);
-      ctx.fillRect(lx - 1 * u, by - 6 * u + upWig, 1 * u, 1 * u);
-      // Bottom legs reach down-and-out
-      ctx.fillRect(lx, by, 1 * u, 1 * u);
+      // Top leg (out & up): joint at thorax, then bent tip up-left
+      ctx.fillRect(lx,        by - 4 * u,         1 * u, 1 * u);
+      ctx.fillRect(lx - 1 * u, by - 5 * u + upWig, 1 * u, 1 * u);
+      // Bottom leg (out & down): joint at thorax, then bent tip down-left
+      ctx.fillRect(lx,        by + 0 * u,         1 * u, 1 * u);
       ctx.fillRect(lx - 1 * u, by + 1 * u - dnWig, 1 * u, 1 * u);
     }
 
-    // Glowing red eyes on the head — two 1u dots.
+    // Glowing red eyes on the head.
     ctx.fillStyle = p.antEye;
-    ctx.fillRect(bx - 1 * u, by - 3 * u, 1 * u, 1 * u);
-    ctx.fillRect(bx,         by - 3 * u, 1 * u, 1 * u);
+    ctx.fillRect(bx + 1 * u, by - 2 * u, 1 * u, 1 * u);
     return;
   }
 
