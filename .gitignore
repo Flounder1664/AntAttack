@@ -1,0 +1,21 @@
+# Claude Code / IDE local config
+.claude/
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node — not currently used, but in case anyone adds tooling later
+node_modules/
+package-lock.json
+
+# Python
+__pycache__/
+*.pyc

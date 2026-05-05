@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Antescher — Ant Attack clone</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css?v=2" />
+</head>
+<body>
+  <div id="stage">
+    <canvas id="game" width="960" height="600"></canvas>
+
+    <div id="hud" class="hidden">
+      <div id="hud-top">
+        <div id="timer">00:00</div>
+        <div id="level-display">L1</div>
+        <div id="grenades">G x 8</div>
+      </div>
+      <div id="hud-bottom">
+        <div id="health"><span></span><span></span><span></span><span></span></div>
+        <div id="hostage-status">Find the hostage</div>
+      </div>
+      <div id="toasts"></div>
+    </div>
+
+    <div id="title" class="overlay">
+      <h1>ANTESCHER</h1>
+      <p class="tag">A walled city. Giant ants. One hostage. Get out alive.</p>
+
+      <div class="row">
+        <div class="col">
+          <h3>Pick your character</h3>
+          <div id="char-pick" class="picks">
+            <button data-char="boy" class="pick selected">Boy</button>
+            <button data-char="girl" class="pick">Girl</button>
+          </div>
+        </div>
+        <div class="col">
+          <h3>Theme</h3>
+          <div id="theme-pick" class="picks"></div>
+        </div>
+      </div>
+
+      <button id="start" class="primary">Enter the city</button>
+
+      <div id="achievements-list">
+        <h3>Achievements</h3>
+        <ul id="ach-ul"></ul>
+      </div>
+
+      <div class="ctrls">
+        <div class="ctrl-row">
+          <span class="ctrl-group"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> / <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Walk</span>
+          <span class="ctrl-group"><kbd>Space</kbd> / <kbd>G</kbd> Grenade</span>
+          <span class="ctrl-group"><kbd>Q</kbd><kbd>E</kbd> Rotate view</span>
+          <span class="ctrl-group"><kbd>Esc</kbd> Pause</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="endscreen" class="overlay hidden">
+      <h1 id="end-title">RESCUED</h1>
+      <p id="end-detail"></p>
+      <ul id="end-achievements"></ul>
+      <button id="next-level" class="primary hidden">Next Level</button>
+      <button id="again" class="primary">Play again</button>
+    </div>
+
+    <div id="pause" class="overlay hidden">
+      <h1>PAUSED</h1>
+      <button id="resume" class="primary">Resume</button>
+      <button id="quit">Back to title</button>
+    </div>
+  </div>
+  <script type="importmap">
+  {
+    "imports": {
+      "http://localhost:8765/src/main.js": "http://localhost:8765/src/main.js?v=32",
+      "http://localhost:8765/src/iso.js": "http://localhost:8765/src/iso.js?v=32",
+      "http://localhost:8765/src/world.js": "http://localhost:8765/src/world.js?v=32",
+      "http://localhost:8765/src/input.js": "http://localhost:8765/src/input.js?v=32",
+      "http://localhost:8765/src/ai.js": "http://localhost:8765/src/ai.js?v=32",
+      "http://localhost:8765/src/themes.js": "http://localhost:8765/src/themes.js?v=32",
+      "http://localhost:8765/src/achievements.js": "http://localhost:8765/src/achievements.js?v=32",
+      "http://localhost:8765/src/storage.js": "http://localhost:8765/src/storage.js?v=32",
+      "http://localhost:8765/src/hud.js": "http://localhost:8765/src/hud.js?v=32",
+      "http://localhost:8765/src/entities/player.js": "http://localhost:8765/src/entities/player.js?v=32",
+      "http://localhost:8765/src/entities/ant.js": "http://localhost:8765/src/entities/ant.js?v=32",
+      "http://localhost:8765/src/entities/hostage.js": "http://localhost:8765/src/entities/hostage.js?v=32",
+      "http://localhost:8765/src/entities/grenade.js": "http://localhost:8765/src/entities/grenade.js?v=32",
+      "http://localhost:8765/src/audio.js": "http://localhost:8765/src/audio.js?v=32"
+    }
+  }
+  </script>
+  <script type="module" src="src/main.js?v=32"></script>
+</body>
+</html>
