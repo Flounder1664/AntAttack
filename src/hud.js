@@ -11,9 +11,38 @@ export function updateHud(state) {
   const ss = String(t % 60).padStart(2, "0");
   $("timer").textContent = `${mm}:${ss}`;
   $("level-display").textContent = `L${state.level}`;
-  $("grenades").textContent = `G x ${state.player.grenades}`;
 
-  // Currency tally — passed in via state.currency. Shown next to grenades.
+  // Weapon counters — only show what the player has unlocked.
+  const gEl = $("grenades");
+  if (gEl) {
+    if (state.player.grenadeUnlocked) {
+      gEl.textContent = `G ${state.player.grenades}`;
+      gEl.classList.remove("locked");
+    } else {
+      gEl.textContent = "G —";
+      gEl.classList.add("locked");
+    }
+  }
+  const mEl = $("mines");
+  if (mEl) {
+    if (state.player.mineUnlocked) {
+      mEl.textContent = `M ${state.player.mines}`;
+      mEl.classList.remove("hidden", "locked");
+    } else {
+      mEl.classList.add("hidden");
+    }
+  }
+  const bEl = $("bolts");
+  if (bEl) {
+    if (state.player.boltUnlocked) {
+      bEl.textContent = `B ${state.player.bolts}`;
+      bEl.classList.remove("hidden", "locked");
+    } else {
+      bEl.classList.add("hidden");
+    }
+  }
+
+  // Currency tally — passed in via state.currency.
   const cur = $("currency");
   if (cur) cur.textContent = `¤ ${state.currency || 0}`;
 

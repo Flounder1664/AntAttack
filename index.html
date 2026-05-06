@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css?v=39" />
+  <link rel="stylesheet" href="style.css?v=40" />
 </head>
 <body>
   <div id="stage">
@@ -17,7 +17,9 @@
       <div id="hud-top">
         <div id="timer">00:00</div>
         <div id="level-display">L1</div>
-        <div id="grenades">G x 8</div>
+        <div id="grenades" class="locked">G —</div>
+        <div id="mines" class="hidden">M 0</div>
+        <div id="bolts" class="hidden">B 0</div>
         <div id="currency">¤ 0</div>
       </div>
       <div id="hud-bottom">
@@ -43,10 +45,11 @@
           <h3>Theme</h3>
           <div id="theme-pick" class="picks"></div>
         </div>
-        <div class="col">
-          <h3>Skills <span id="currency-total" class="currency-badge">¤ 0</span></h3>
-          <div id="skills-grid" class="skills-grid"></div>
-        </div>
+      </div>
+
+      <div class="col col-skills">
+        <h3>Skills <span id="currency-total" class="currency-badge">¤ 0</span></h3>
+        <div id="skills-grid" class="skills-grid"></div>
       </div>
 
       <button id="start" class="primary">Enter the city</button>
@@ -59,8 +62,13 @@
       <div class="ctrls">
         <div class="ctrl-row">
           <span class="ctrl-group"><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> / <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> Walk</span>
-          <span class="ctrl-group"><kbd>Space</kbd> / <kbd>G</kbd> Grenade</span>
-          <span class="ctrl-group"><kbd>Q</kbd><kbd>E</kbd> Rotate view</span>
+          <span class="ctrl-group"><kbd>Space</kbd>/<kbd>G</kbd> Grenade</span>
+          <span class="ctrl-group"><kbd>M</kbd> Mine</span>
+          <span class="ctrl-group"><kbd>B</kbd> Bolt</span>
+          <span class="ctrl-group"><kbd>Z</kbd> Decoy</span>
+          <span class="ctrl-group"><kbd>F</kbd> Grapple</span>
+          <span class="ctrl-group"><kbd>Tab</kbd> Map</span>
+          <span class="ctrl-group"><kbd>Q</kbd><kbd>E</kbd> Rotate</span>
           <span class="ctrl-group"><kbd>Esc</kbd> Pause</span>
         </div>
       </div>
@@ -83,25 +91,28 @@
   <script type="importmap">
   {
     "imports": {
-      "http://localhost:8765/src/main.js": "http://localhost:8765/src/main.js?v=39",
-      "http://localhost:8765/src/iso.js": "http://localhost:8765/src/iso.js?v=39",
-      "http://localhost:8765/src/world.js": "http://localhost:8765/src/world.js?v=39",
-      "http://localhost:8765/src/input.js": "http://localhost:8765/src/input.js?v=39",
-      "http://localhost:8765/src/ai.js": "http://localhost:8765/src/ai.js?v=39",
-      "http://localhost:8765/src/themes.js": "http://localhost:8765/src/themes.js?v=39",
-      "http://localhost:8765/src/achievements.js": "http://localhost:8765/src/achievements.js?v=39",
-      "http://localhost:8765/src/storage.js": "http://localhost:8765/src/storage.js?v=39",
-      "http://localhost:8765/src/hud.js": "http://localhost:8765/src/hud.js?v=39",
-      "http://localhost:8765/src/skills.js": "http://localhost:8765/src/skills.js?v=39",
-      "http://localhost:8765/src/entities/player.js": "http://localhost:8765/src/entities/player.js?v=39",
-      "http://localhost:8765/src/entities/ant.js": "http://localhost:8765/src/entities/ant.js?v=39",
-      "http://localhost:8765/src/entities/hostage.js": "http://localhost:8765/src/entities/hostage.js?v=39",
-      "http://localhost:8765/src/entities/grenade.js": "http://localhost:8765/src/entities/grenade.js?v=39",
-      "http://localhost:8765/src/entities/pickup.js": "http://localhost:8765/src/entities/pickup.js?v=39",
-      "http://localhost:8765/src/audio.js": "http://localhost:8765/src/audio.js?v=39"
+      "http://localhost:8765/src/main.js": "http://localhost:8765/src/main.js?v=40",
+      "http://localhost:8765/src/iso.js": "http://localhost:8765/src/iso.js?v=40",
+      "http://localhost:8765/src/world.js": "http://localhost:8765/src/world.js?v=40",
+      "http://localhost:8765/src/input.js": "http://localhost:8765/src/input.js?v=40",
+      "http://localhost:8765/src/ai.js": "http://localhost:8765/src/ai.js?v=40",
+      "http://localhost:8765/src/themes.js": "http://localhost:8765/src/themes.js?v=40",
+      "http://localhost:8765/src/achievements.js": "http://localhost:8765/src/achievements.js?v=40",
+      "http://localhost:8765/src/storage.js": "http://localhost:8765/src/storage.js?v=40",
+      "http://localhost:8765/src/hud.js": "http://localhost:8765/src/hud.js?v=40",
+      "http://localhost:8765/src/skills.js": "http://localhost:8765/src/skills.js?v=40",
+      "http://localhost:8765/src/entities/player.js": "http://localhost:8765/src/entities/player.js?v=40",
+      "http://localhost:8765/src/entities/ant.js": "http://localhost:8765/src/entities/ant.js?v=40",
+      "http://localhost:8765/src/entities/hostage.js": "http://localhost:8765/src/entities/hostage.js?v=40",
+      "http://localhost:8765/src/entities/grenade.js": "http://localhost:8765/src/entities/grenade.js?v=40",
+      "http://localhost:8765/src/entities/pickup.js": "http://localhost:8765/src/entities/pickup.js?v=40",
+      "http://localhost:8765/src/entities/mine.js": "http://localhost:8765/src/entities/mine.js?v=40",
+      "http://localhost:8765/src/entities/bolt.js": "http://localhost:8765/src/entities/bolt.js?v=40",
+      "http://localhost:8765/src/entities/decoy.js": "http://localhost:8765/src/entities/decoy.js?v=40",
+      "http://localhost:8765/src/audio.js": "http://localhost:8765/src/audio.js?v=40"
     }
   }
   </script>
-  <script type="module" src="src/main.js?v=39"></script>
+  <script type="module" src="src/main.js?v=40"></script>
 </body>
 </html>

@@ -606,6 +606,75 @@ export function drawGround(ctx, rx, ry, shadowed = false) {
   }
 }
 
+// Mine — small disc on the ground with a pulsing red dot to read as armed.
+export function drawMine(ctx, sx, sy, state, expT) {
+  const u = Math.max(2, Math.round(TILE_W / 30));
+  const cx = sx, cy = sy - u * 0.6;
+  if (state === "exploding") {
+    drawExplosion(ctx, sx, sy, expT);
+    return;
+  }
+  // disc body
+  ctx.fillStyle = "#1a1a1a";
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, u * 1.4, u * 0.6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = Math.max(1, u / 4);
+  ctx.stroke();
+  // pulsing armed light
+  const pulse = 0.55 + 0.45 * Math.sin(performance.now() / 280);
+  ctx.fillStyle = `rgba(255, 60, 60, ${pulse})`;
+  ctx.beginPath();
+  ctx.arc(cx, cy - u * 0.15, u * 0.35, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Bolt — short streak in the bolt's flight direction.
+export function drawBolt(ctx, sx, sy, dx, dy) {
+  const u = Math.max(2, Math.round(TILE_W / 30));
+  // Approximate screen direction from world dx/dy: just scale tile_w/h.
+  const ddx = (dx - dy) * (TILE_W * 0.25);
+  const ddy = (dx + dy) * (TILE_H * 0.25);
+  ctx.strokeStyle = "#ffcc66";
+  ctx.lineWidth = Math.max(2, u / 1.4);
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(sx - ddx, sy - ddy - u * 0.6);
+  ctx.lineTo(sx + ddx, sy + ddy - u * 0.6);
+  ctx.stroke();
+  // bright tip
+  ctx.fillStyle = "#fff5c0";
+  ctx.beginPath();
+  ctx.arc(sx + ddx, sy + ddy - u * 0.6, u * 0.4, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Decoy — pheromone burst with a fading aura. ttl 0..1 (1=fresh).
+export function drawDecoy(ctx, sx, sy, ttlFrac) {
+  const u = Math.max(2, Math.round(TILE_W / 30));
+  const cx = sx, cy = sy - u * 0.5;
+  const a = Math.max(0, ttlFrac);
+  // expanding ring pulse
+  const ringPhase = ((performance.now() / 300) % 1);
+  ctx.save();
+  ctx.globalAlpha = a * (1 - ringPhase) * 0.7;
+  ctx.strokeStyle = "#9affae";
+  ctx.lineWidth = Math.max(2, u / 2);
+  ctx.beginPath();
+  ctx.arc(cx, cy, u * (1 + ringPhase * 2.5), 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+  // core dot
+  ctx.fillStyle = `rgba(154,255,174,${0.6 * a})`;
+  ctx.beginPath();
+  ctx.arc(cx, cy, u * 0.7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#3a8a4f";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
 // Expanding explosion ring.
 export function drawExplosion(ctx, sx, sy, t) {
   const p = palette();

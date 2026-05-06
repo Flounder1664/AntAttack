@@ -4,6 +4,7 @@ import {
   setCamera, getCamera,
   rotateWorld, project, sortKey,
   drawCube, drawGround, drawShadow, drawHumanoid, drawAnt, drawGrenade, drawExplosion, drawPickup,
+  drawMine, drawBolt, drawDecoy,
 } from "./iso.js";
 
 import {
@@ -23,6 +24,10 @@ import { makeHostage, tickHostage, hostageRenderPos, touchedBy, walkPhaseHostage
 import { makeAnt, tickAnt, antRenderPos, consumeBite, buildAntPath, pickAntType } from "./entities/ant.js";
 import { makeGrenade, tickGrenade, applyBlast } from "./entities/grenade.js";
 import { makePickup, applyPickup, pickupTouched, pickPickupType, PICKUP_TYPES } from "./entities/pickup.js";
+import { makeMine, tickMine, detonate as detonateMine, applyMineBlast } from "./entities/mine.js";
+import { makeBolt, tickBolt } from "./entities/bolt.js";
+import { makeDecoy, tickDecoy } from "./entities/decoy.js";
+import { bfsTo } from "./ai.js";
 import * as skills from "./skills.js";
 
 // ------- Death flavour text -------
@@ -94,21 +99,25 @@ function safeTopAt(world, nx, ny) {
 // timer / antInterval / maxAnts kept at original values (the user
 // noted that level 1 is already the right difficulty). Difficulty
 // progression now comes from enemy variety + map verticality.
+//
+// `grenades: 0` across all levels — players unlock grenades via the
+// GRENADES skill branch (T1 "Grenade Pin" gives 1 starting grenade,
+// repeat T2 "Quartermaster" stacks more). Same for mines and bolts.
 const LEVELS = [
   // L0 — flat tutorial-ish: low scatter only, no maze, low set-pieces.
-  { w: 40, l: 40, h: 6, timer: 180, grenades: 8, maxAnts: 18, antInterval: 4500, mazeLevel: 0.00,
+  { w: 40, l: 40, h: 6, timer: 180, grenades: 0, maxAnts: 18, antInterval: 4500, mazeLevel: 0.00,
     verticality: 0.0, setPieceMaxH: 1, setPieces: ["courtyard", "lshape", "zigzag"], pickupCount: 6 },
-  { w: 44, l: 44, h: 6, timer: 210, grenades: 8, maxAnts: 21, antInterval: 4100, mazeLevel: 0.10,
+  { w: 44, l: 44, h: 6, timer: 210, grenades: 0, maxAnts: 21, antInterval: 4100, mazeLevel: 0.10,
     verticality: 0.25, setPieceMaxH: 2, setPieces: ["courtyard", "lshape", "zigzag", "staircase", "tower"], pickupCount: 7 },
-  { w: 48, l: 48, h: 6, timer: 240, grenades: 8, maxAnts: 24, antInterval: 3800, mazeLevel: 0.22,
+  { w: 48, l: 48, h: 6, timer: 240, grenades: 0, maxAnts: 24, antInterval: 3800, mazeLevel: 0.22,
     verticality: 0.5, setPieceMaxH: 2, setPieces: ["courtyard", "lshape", "zigzag", "staircase", "tower", "bridge"], pickupCount: 8 },
-  { w: 52, l: 52, h: 6, timer: 255, grenades: 7, maxAnts: 27, antInterval: 3400, mazeLevel: 0.38,
+  { w: 52, l: 52, h: 6, timer: 255, grenades: 0, maxAnts: 27, antInterval: 3400, mazeLevel: 0.38,
     verticality: 0.75, setPieceMaxH: 3, setPieces: ["courtyard", "lshape", "zigzag", "staircase", "tower", "bridge", "arch"], pickupCount: 9 },
-  { w: 56, l: 56, h: 6, timer: 270, grenades: 6, maxAnts: 30, antInterval: 3000, mazeLevel: 0.54,
+  { w: 56, l: 56, h: 6, timer: 270, grenades: 0, maxAnts: 30, antInterval: 3000, mazeLevel: 0.54,
     verticality: 1.0, setPieceMaxH: 3, setPieces: ["courtyard", "lshape", "zigzag", "staircase", "tower", "bridge", "arch"], pickupCount: 10 },
-  { w: 60, l: 60, h: 6, timer: 285, grenades: 6, maxAnts: 34, antInterval: 2600, mazeLevel: 0.70,
+  { w: 60, l: 60, h: 6, timer: 285, grenades: 0, maxAnts: 34, antInterval: 2600, mazeLevel: 0.70,
     verticality: 1.0, setPieceMaxH: 3, setPieces: ["courtyard", "lshape", "zigzag", "staircase", "tower", "bridge", "arch"], pickupCount: 11 },
-  { w: 64, l: 64, h: 6, timer: 300, grenades: 5, maxAnts: 38, antInterval: 2200, mazeLevel: 0.88,
+  { w: 64, l: 64, h: 6, timer: 300, grenades: 0, maxAnts: 38, antInterval: 2200, mazeLevel: 0.88,
     verticality: 1.0, setPieceMaxH: 3, setPieces: ["courtyard", "lshape", "zigzag", "staircase", "tower", "bridge", "arch"], pickupCount: 12 },
 ];
 
@@ -117,7 +126,7 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
 let world, spawnPlayer, spawnHostage, gaps, nests, pickups;
-let player, hostage, ants, grenades, explosions;
+let player, hostage, ants, grenades, mines, bolts, decoys, explosions;
 let mode = "title"; // title | playing | paused | end
 let lastT = 0;
 let timerSec = 0;
@@ -214,14 +223,19 @@ function refreshSkillTree() {
     const head = document.createElement("h4");
     head.textContent = branch;
     col.appendChild(head);
-    for (let tier = 1; tier <= 4; tier++) {
+    for (let tier = 1; tier <= 5; tier++) {
       const node = skills.SKILLS.find(s => s.branch === branch && s.tier === tier);
       if (!node) continue;
       const status = skills.statusFor(node, cur);
+      const lvl = skills.getLevel(node.id);
+      const isRepeatable = node.maxLevel > 1;
       const btn = document.createElement("button");
       btn.className = `skill-cell skill-${status}`;
       btn.disabled = status !== "available";
-      btn.innerHTML = `<b>${node.name}</b><br><small>${node.desc}</small><br><span>¤ ${node.cost}</span>`;
+      const lvlBadge = isRepeatable && lvl > 0
+        ? `<em>Lv.${lvl}${node.maxLevel < 99 ? "/" + node.maxLevel : ""}</em>`
+        : "";
+      btn.innerHTML = `<b>${node.name}</b> ${lvlBadge}<br><small>${node.desc}</small><br><span>¤ ${node.cost}</span>`;
       btn.title = `Tier ${tier}`;
       btn.addEventListener("click", () => {
         const before = loadCurrency();
@@ -229,7 +243,7 @@ function refreshSkillTree() {
         if (!r.ok) return;
         saveCurrency(r.newCurrency);
         playPurchase();
-        toast(`Skill bought: ${r.skill.name}`);
+        toast(`Skill bought: ${r.skill.name}${r.newLevel > 1 ? " Lv." + r.newLevel : ""}`);
         ach.emit("skill_bought", { id: r.skill.id, branch: r.skill.branch, tier: r.skill.tier });
         refreshSkillTree();
         refreshAchievementList();
@@ -288,13 +302,34 @@ function startRun(levelIdx = 0) {
   player = makePlayer(spawnPlayer, selectedChar(), {
     health: runSpec.health,
     maxHealth: runSpec.maxHealth,
-    grenades: runSpec.grenades,
+    grenades: runSpec.grenades + (runSpec.grenadeStart || 0),
+    mines: runSpec.mineStart || 0,
+    bolts: runSpec.boltStart || 0,
+    grenadeUnlocked: runSpec.grenadeUnlocked,
+    mineUnlocked: runSpec.mineUnlocked,
+    boltUnlocked: runSpec.boltUnlocked,
+    decoyUnlocked: runSpec.decoyUnlocked,
     fallTolerance: runSpec.fallTolerance,
     walkSpeedMult: runSpec.walkSpeedMult,
+    blastRadius: runSpec.blastRadius,
+    mineRadius: runSpec.mineRadius,
+    boltPierce: runSpec.boltPierce,
+    boltStorm: runSpec.boltStorm,
+    boltRicochet: runSpec.boltRicochet,
+    stickyFrag: runSpec.stickyFrag,
+    quickThrow: runSpec.quickThrow,
+    tripWire: runSpec.tripWire,
+    remoteDetonator: runSpec.remoteDetonator,
+    adrenaline: runSpec.adrenaline,
+    grapplingStep: runSpec.grapplingStep,
+    mapVision: runSpec.mapVision,
   });
   hostage = makeHostage(spawnHostage);
   ants = [];
   grenades = [];
+  mines = [];
+  bolts = [];
+  decoys = [];
   explosions = [];
   timerSec = TIMER_BUDGET;
   _lastTimerInt = TIMER_BUDGET + 1;
@@ -309,6 +344,13 @@ function startRun(levelIdx = 0) {
   runBreakdown = { kills: 0, pickups: 0, rescue: 0, timeBonus: 0, achievements: 0, fail: 0 };
   runState.timerBonus = 0;
   runState.mapRevealMs = runSpec.exitRevealed ? Infinity : 0;
+
+  // Apply Field Medic heal-on-start (also caps at maxHealth via player.heal).
+  // Player already starts at runSpec.health which already includes it via
+  // the spec computation; nothing extra to do here.
+
+  // Reset per-level flags.
+  player.grapplingUsed = false;
 
   if (levelIdx > 0) toast(`Level ${levelIdx + 1} — The city grows larger`);
 
@@ -410,15 +452,82 @@ function handleEdgeActions() {
     if (a === "rotL") setRotation(getRotation() + 3);
     else if (a === "rotR") setRotation(getRotation() + 1);
     else if (a === "grenade") throwGrenade();
+    else if (a === "mine")    placeMine();
+    else if (a === "bolt")    fireBolt();
+    else if (a === "decoy")   dropDecoy();
+    else if (a === "grapple") grappleStep();
+    else if (a === "map")     toggleMap();
   }
 }
 
 function throwGrenade() {
+  if (!player.grenadeUnlocked) { toast("Grenades locked — buy Grenade Pin"); return; }
   if (player.grenades <= 0) return;
   player.grenades -= 1;
   player.grenadesUsed += 1;
   grenades.push(makeGrenade(player));
   playThrow();
+}
+
+function placeMine() {
+  if (!player.mineUnlocked) { toast("Mines locked — buy Mine Layer"); return; }
+  // Remote Detonator: a re-press detonates every armed mine instantly.
+  if (player.remoteDetonator && mines.some(m => m.state === "armed")) {
+    for (const m of mines) detonateMine(m);
+    playPing();
+    return;
+  }
+  if (player.mines <= 0) return;
+  // No two mines on the same tile.
+  if (mines.some(m => m.state === "armed" && m.x === player.x && m.y === player.y && m.z === player.z)) return;
+  player.mines -= 1;
+  player.minesPlaced += 1;
+  mines.push(makeMine({ x: player.x, y: player.y, z: player.z }));
+  playPing();
+}
+
+function fireBolt() {
+  if (!player.boltUnlocked) { toast("Bolts locked — buy Crossbow"); return; }
+  if (player.bolts <= 0) return;
+  player.bolts -= 1;
+  player.boltsFired += 1;
+  // Bolt Storm: fire 3 in a perpendicular spread.
+  if (player.boltStorm) {
+    const f = player.facing || { dx: 1, dy: 0 };
+    const perp = { dx: -f.dy, dy: f.dx };
+    bolts.push(makeBolt(player, { ox: player.x,           oy: player.y,           oz: player.z, pierce: player.boltPierce, ricochet: player.boltRicochet }));
+    bolts.push(makeBolt(player, { ox: player.x + perp.dx, oy: player.y + perp.dy, oz: player.z, pierce: player.boltPierce, ricochet: player.boltRicochet }));
+    bolts.push(makeBolt(player, { ox: player.x - perp.dx, oy: player.y - perp.dy, oz: player.z, pierce: player.boltPierce, ricochet: player.boltRicochet }));
+  } else {
+    bolts.push(makeBolt(player, { pierce: player.boltPierce, ricochet: player.boltRicochet }));
+  }
+  playThrow();
+}
+
+function dropDecoy() {
+  if (!player.decoyUnlocked) { toast("Decoy locked — buy Decoy"); return; }
+  // Only one decoy active at a time.
+  if (decoys.some(d => d.state === "active")) return;
+  decoys.push(makeDecoy({ x: player.x, y: player.y, z: player.z }));
+  playPing();
+  toast("Decoy active — ants distracted for 5s");
+}
+
+function grappleStep() {
+  if (!player.grapplingStep) return;
+  if (player.grapplingUsed) { toast("Grappling Step already used this level"); return; }
+  if (playerMoving(player)) return;
+  const f = player.facing || { dx: 0, dy: 1 };
+  const antAt = (x, y, z) => ants.some(a => a.alive && a.x === x && a.y === y && a.z === z);
+  if (tryStep(player, world, f.dx, f.dy, antAt, true)) {
+    player.grapplingUsed = true;
+    playPing();
+  }
+}
+
+function toggleMap() {
+  if (!player.mapVision) return;
+  player.mapVisionOn = !player.mapVisionOn;
 }
 
 function handleHeldMovement() {
@@ -514,10 +623,18 @@ function update(dtMs) {
     if (runState.mapRevealMs < 0) runState.mapRevealMs = 0;
   }
 
-  // Ants — periodically rebuild shared BFS path from player.
+  // Decoys — tick down their timers.
+  for (const d of decoys) tickDecoy(d, dtMs);
+  decoys = decoys.filter(d => d.state !== "done");
+
+  // Ants — periodically rebuild shared BFS path. If a decoy is active the
+  // ants pathfind to the decoy instead of the player; this is what lets
+  // Decoy actually divert the swarm.
   pathRebuildMs -= dtMs;
   if (pathRebuildMs <= 0) {
-    pathPlayerCache = buildAntPath(world, player);
+    const activeDecoy = decoys.find(d => d.state === "active");
+    const target = activeDecoy || player;
+    pathPlayerCache = bfsTo(world, target.x, target.y);
     pathRebuildMs = 250;
   }
   for (const a of ants) {
@@ -546,7 +663,7 @@ function update(dtMs) {
   // Grenades + explosions
   for (const g of grenades) {
     const wasFlying = g.state === "flying";
-    tickGrenade(g, dtMs);
+    tickGrenade(g, dtMs, { stickyFrag: !!(runSpec && runSpec.stickyFrag) }, ants);
     if (wasFlying && g.state === "exploding") {
       playExplosion();
       const radius = runSpec ? runSpec.blastRadius : 1;
@@ -554,6 +671,24 @@ function update(dtMs) {
       if (kills > 0) ach.emit("multi_kill", { count: kills });
     }
   }
+  // Mines
+  for (const m of mines) {
+    const wasArmed = m.state === "armed";
+    tickMine(m, dtMs, ants, { tripWire: !!(runSpec && runSpec.tripWire) });
+    if (wasArmed && m.state === "exploding") {
+      playExplosion();
+      const radius = runSpec ? runSpec.mineRadius : 1;
+      const { kills } = applyMineBlast(m, ants, radius);
+      if (kills > 0) ach.emit("multi_kill", { count: kills });
+    }
+  }
+  mines = mines.filter(m => m.state !== "done");
+  // Bolts
+  for (const b of bolts) {
+    const killed = tickBolt(b, dtMs, world, ants);
+    if (killed.length > 0) ach.emit("multi_kill", { count: killed.length });
+  }
+  bolts = bolts.filter(b => b.state !== "done");
   // Per-tick kill bookkeeping — picks up any dead-and-unprocessed ants from
   // this frame's blasts (regardless of which grenade did the killing).
   for (const a of ants) {
@@ -705,6 +840,19 @@ function render() {
     const [rx, ry] = rotateWorld(g.rx, g.ry, W, L);
     list.push({ key: sortKey(rx, ry, g.rz) + 0.7, kind: "grenade", rx, ry, rz: g.rz, g });
   }
+  for (const m of mines) {
+    const [rx, ry] = rotateWorld(m.x, m.y, W, L);
+    list.push({ key: sortKey(rx, ry, m.z) + 0.25, kind: "mine", rx, ry, rz: m.z, m });
+  }
+  for (const d of decoys) {
+    if (d.state !== "active") continue;
+    const [rx, ry] = rotateWorld(d.x, d.y, W, L);
+    list.push({ key: sortKey(rx, ry, d.z) + 0.45, kind: "decoy", rx, ry, rz: d.z, d });
+  }
+  for (const b of bolts) {
+    const [rx, ry] = rotateWorld(b.rx, b.ry, W, L);
+    list.push({ key: sortKey(rx, ry, b.rz) + 0.55, kind: "bolt", rx, ry, rz: b.rz, b });
+  }
 
   list.sort((a, b) => a.key - b.key);
 
@@ -763,6 +911,15 @@ function render() {
       const [sx, sy] = project(item.rx, item.ry, item.rz);
       if (item.g.state === "flying") drawGrenade(ctx, sx, sy);
       else if (item.g.state === "exploding") drawExplosion(ctx, sx, sy, item.g.expT);
+    } else if (item.kind === "mine") {
+      const [sx, sy] = project(item.rx, item.ry, item.rz);
+      drawMine(ctx, sx, sy, item.m.state, item.m.expT);
+    } else if (item.kind === "decoy") {
+      const [sx, sy] = project(item.rx, item.ry, item.rz);
+      drawDecoy(ctx, sx, sy, Math.max(0, item.d.ttl / 5000));
+    } else if (item.kind === "bolt") {
+      const [sx, sy] = project(item.rx, item.ry, item.rz);
+      drawBolt(ctx, sx, sy, item.b.dx, item.b.dy);
     }
   }
 
@@ -820,6 +977,48 @@ function render() {
   vg.addColorStop(1, p.fog);
   ctx.fillStyle = vg;
   ctx.fillRect(0, 0, cw, ch);
+
+  // Minimap (Map Vision skill — Tab toggles it).
+  if (player && player.mapVisionOn) {
+    const cellSize = Math.max(2, Math.floor(160 / Math.max(W, L)));
+    const mw = W * cellSize, mh = L * cellSize;
+    const mx = cw - mw - 16, my = 16;
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(mx - 4, my - 4, mw + 8, mh + 8);
+    ctx.strokeStyle = p.uiAccent || "#fff";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(mx - 4, my - 4, mw + 8, mh + 8);
+    // tile heights
+    for (let x = 0; x < W; x++) {
+      for (let y = 0; y < L; y++) {
+        const t = topAt(world, x, y);
+        if (t === 0) continue;
+        const v = Math.min(1, t / 4);
+        ctx.fillStyle = `rgba(255,255,255,${0.12 + v * 0.28})`;
+        ctx.fillRect(mx + x * cellSize, my + y * cellSize, cellSize, cellSize);
+      }
+    }
+    // exit gaps
+    if (gaps) {
+      ctx.fillStyle = p.uiAccent || "#7df";
+      for (const g of gaps) {
+        ctx.fillRect(mx + g.x * cellSize - 1, my + g.y * cellSize - 1, cellSize + 2, cellSize + 2);
+      }
+    }
+    // ants
+    ctx.fillStyle = "#ff5566";
+    for (const a of ants) {
+      ctx.fillRect(mx + a.x * cellSize, my + a.y * cellSize, cellSize, cellSize);
+    }
+    // hostage
+    ctx.fillStyle = p.hostage || "#ffaa00";
+    ctx.fillRect(mx + hostage.x * cellSize - 1, my + hostage.y * cellSize - 1, cellSize + 2, cellSize + 2);
+    // player
+    ctx.fillStyle = p.player || "#ffffff";
+    ctx.fillRect(mx + player.x * cellSize - 1, my + player.y * cellSize - 1, cellSize + 2, cellSize + 2);
+    ctx.restore();
+  }
 }
 
 // ------- Loop -------
