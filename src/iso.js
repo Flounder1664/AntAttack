@@ -95,22 +95,20 @@ export function drawCube(ctx, rx, ry, z, kind = "block", opts = {}) {
   const hw = TILE_W / 2;
   const hh = TILE_H / 2;
 
-  // Per-z brightness modulation — slightly brighter at higher levels and
-  // slightly darker at the ground, so stacked structures gain visible
-  // tier-to-tier contrast without abandoning the uniform Spectrum white.
-  // Centred around z=1 so the visual change is balanced (no overall shift).
-  // The tint is applied BEFORE the stipple (so base lightness shifts and
-  // the stipple texture sits on top), which makes the change much more
-  // visible than tinting the final composited surface.
-  //   z=0 → -6%
-  //   z=1 →  0%
-  //   z=2 → +6%
-  //   z=3 → +12%
-  //   z≥4 → +18% (capped)
-  const zStep = 0.06;
-  const zTint = Math.max(-zStep, Math.min(zStep * 3, (z - 1) * zStep));
+  // Per-z brightness modulation — uses a single darkening overlay whose
+  // alpha decreases with z. A white→white "brightening" overlay does nothing
+  // (you can't brighten pure white), so we instead darken the lower tiers
+  // and let higher tiers appear bright by comparison.
+  //   z=0 → 16% black overlay (visibly darker)
+  //   z=1 → 12%
+  //   z=2 →  8%
+  //   z=3 →  4%
+  //   z≥4 →  0% (full base brightness)
+  const baseDarken = 0.16;
+  const zStep = 0.04;
+  const zDarken = Math.max(0, baseDarken - z * zStep);
 
-  // Helper: fill a path with the base colour, apply the z brightness tint
+  // Helper: fill a path with the base colour, apply the z darkening tint
   // (so the base shifts), then overlay stipple texture and any shadow tint
   // on top of the modulated base.
   const fillFace = (path, color, stippleKey, shadowTint = false) => {
@@ -119,10 +117,8 @@ export function drawCube(ctx, rx, ry, z, kind = "block", opts = {}) {
     ctx.closePath();
     ctx.fillStyle = color;
     ctx.fill();
-    if (zTint !== 0) {
-      ctx.fillStyle = zTint > 0
-        ? `rgba(255,255,255,${zTint})`
-        : `rgba(0,0,0,${-zTint})`;
+    if (zDarken > 0) {
+      ctx.fillStyle = `rgba(0,0,0,${zDarken})`;
       ctx.fill();
     }
     if (stippleKey && pats) {
