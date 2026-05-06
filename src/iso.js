@@ -99,12 +99,12 @@ export function drawCube(ctx, rx, ry, z, kind = "block", opts = {}) {
   // slightly darker at the ground, so stacked structures gain visible
   // tier-to-tier contrast without abandoning the uniform Spectrum white.
   // Centred around z=1 so the visual change is balanced (no overall shift).
-  //   z=0 → -3.5% (faint dark overlay)
-  //   z=1 →  0%   (unchanged)
-  //   z=2 → +3.5% (faint white overlay)
-  //   z=3 → +7%
-  //   z≥4 → +10.5% (capped)
-  const zStep = 0.035;
+  //   z=0 → -4% (faint dark overlay)
+  //   z=1 →  0%  (unchanged)
+  //   z=2 → +4% (faint white overlay)
+  //   z=3 → +8%
+  //   z≥4 → +12% (capped)
+  const zStep = 0.04;
   const zTint = Math.max(-zStep, Math.min(zStep * 3, (z - 1) * zStep));
 
   // Helper: fill a path, then optionally overlay stipple, shadow tint, and
