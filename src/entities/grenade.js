@@ -41,21 +41,31 @@ export function tickGrenade(g, dtMs) {
   }
 }
 
-// Resolve the blast: kill ants in range. Called once when state transitions
+// Resolve the blast: damage ants in range. Called once when state transitions
 // to exploding (main loop checks `g._didBlast`).
-export function applyBlast(g, ants) {
-  if (g._didBlast || g.state !== "exploding") return 0;
+//
+// `radius` is the Manhattan radius in (x,y); MUNITIONS-Tier4 skill bumps it.
+//
+// Returns { kills, hits } so the caller can fire `multi_kill` only on actual
+// kills while still tracking hits for sound/animation timing.
+export function applyBlast(g, ants, radius = 1) {
+  if (g._didBlast || g.state !== "exploding") return { kills: 0, hits: 0 };
   g._didBlast = true;
   let kills = 0;
+  let hits = 0;
   for (const a of ants) {
     if (!a.alive) continue;
     const dx = Math.abs(a.x - Math.round(g.tx));
     const dy = Math.abs(a.y - Math.round(g.ty));
     const dz = Math.abs(a.z - Math.round(g.oz));
-    if (dx + dy <= 1 && dz <= 1) {
-      a.alive = false;
-      kills += 1;
+    if (dx + dy <= radius && dz <= 1) {
+      hits += 1;
+      a.hp = (a.hp || 1) - 1;
+      if (a.hp <= 0) {
+        a.alive = false;
+        kills += 1;
+      }
     }
   }
-  return kills;
+  return { kills, hits };
 }

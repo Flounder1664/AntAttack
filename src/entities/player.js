@@ -1,8 +1,18 @@
 import { feetAt, get, W, L } from "../world.js";
 
-const STEP_MS = 130;
+const BASE_STEP_MS = 130;
 
-export function makePlayer(spawn, character = "boy") {
+// makePlayer accepts opts that come from skills + level config.
+// Defaults match the new 1-life-baseline progression model.
+export function makePlayer(spawn, character = "boy", opts = {}) {
+  const {
+    health = 1,
+    maxHealth = 1,
+    grenades = 8,
+    fallTolerance = 1,   // a drop > fallTolerance deals (drop - fallTolerance) damage
+    walkSpeedMult = 1,   // 1 = base; 1.1 = 10% faster (lower step interval)
+    shieldUp = false,    // SHIELD pickup — absorbs next bite
+  } = opts;
   return {
     kind: "player",
     character,
@@ -11,14 +21,18 @@ export function makePlayer(spawn, character = "boy") {
     tx: spawn.x, ty: spawn.y, tz: spawn.z,
     moveT: 0,                 // 0..1 between (x,y,z) and (tx,ty,tz)
     facing: { dx: 0, dy: 1 }, // last direction moved (for grenade aim)
-    health: 4,
+    health,
+    maxHealth,
     bites: 0,
-    grenades: 8,
+    grenades,
     grenadesUsed: 0,
     alive: true,
     stepCount: 0,
     pendingFallDamage: 0,     // set in tryStep, applied on landing
     deathCause: null,         // "ant" | "fall" — set when health hits 0
+    fallTolerance,
+    walkSpeedMult,
+    shieldUp,
   };
 }
 
@@ -41,6 +55,14 @@ export function takeFallDamage(p, amount) {
   if (p.health <= 0) { p.alive = false; p.deathCause = "fall"; }
 }
 
+// Heal — capped at p.maxHealth. Returns the amount actually applied.
+export function heal(p, amount) {
+  if (!p.alive || amount <= 0) return 0;
+  const before = p.health;
+  p.health = Math.min(p.maxHealth, p.health + amount);
+  return p.health - before;
+}
+
 // Try to move one tile. Unlike canStep (which blocks drops > 1), the player
 // is allowed to walk off edges of any height — the drop is recorded and
 // applied as fall damage when the animation completes in tickPlayer.
@@ -58,8 +80,9 @@ export function tryStep(p, world, dx, dy, isBlocked = null) {
   p.moveT = 0;
   p.facing = { dx, dy };
   p.stepCount = (p.stepCount + 1) | 0;
-  // Falling 2+ blocks deals (drop − 1) damage on landing.
-  p.pendingFallDamage = fa - fb > 1 ? fa - fb - 1 : 0;
+  // Falling more than fallTolerance blocks deals (drop - fallTolerance) damage.
+  const drop = fa - fb;
+  p.pendingFallDamage = drop > p.fallTolerance ? drop - p.fallTolerance : 0;
   return true;
 }
 
@@ -72,7 +95,9 @@ export function walkPhase(p) {
 // Returns the fall damage dealt this tick (0 when no landing occurred).
 export function tickPlayer(p, dtMs) {
   if (!isMoving(p)) return 0;
-  p.moveT += dtMs / STEP_MS;
+  // walkSpeedMult > 1 means faster — divide step interval by it.
+  const stepMs = BASE_STEP_MS / (p.walkSpeedMult || 1);
+  p.moveT += dtMs / stepMs;
   if (p.moveT >= 1) {
     p.x = p.tx; p.y = p.ty; p.z = p.tz;
     p.moveT = 0;
@@ -84,9 +109,15 @@ export function tickPlayer(p, dtMs) {
   return 0;
 }
 
+// Returns true if a shield consumed the bite.
 export function bite(p) {
-  if (!p.alive) return;
+  if (!p.alive) return false;
+  if (p.shieldUp) {
+    p.shieldUp = false;
+    return true;  // shield absorbed it
+  }
   p.bites += 1;
   p.health -= 1;
   if (p.health <= 0) { p.alive = false; p.deathCause = "ant"; }
+  return false;
 }

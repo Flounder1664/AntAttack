@@ -212,9 +212,24 @@ function spawnZigzag(world, x, y, horiz, zags = 3, h = 2) {
 //  - A handful of ant-nest tiles scattered on the ground.
 //  - Player spawn near a wall gap; hostage spawn deep inside, far from gaps.
 //
-// Returns { spawnPlayer, spawnHostage, gaps, nests }.
+// Returns { spawnPlayer, spawnHostage, gaps, nests, pickups }.
+//
+// `opts` may include:
+//   mazeLevel       — corridor density (existing)
+//   verticality     — 0..1 cap on cluster + corridor heights (NEW)
+//   setPieces       — whitelist of allowed set-piece kinds (NEW)
+//   setPieceMaxH    — cap on set-piece heights for that level (NEW)
+//   pickupCount     — how many pickups to place (NEW)
+//   pickupTypeFor() — function (slotIdx) → type string (NEW)
 export function generateCity(world, opts = {}) {
-  const { mazeLevel = 0 } = opts;
+  const {
+    mazeLevel = 0,
+    verticality = 1.0,
+    setPieces = ["arch", "bridge", "tower", "courtyard", "staircase", "lshape", "zigzag"],
+    setPieceMaxH = 3,
+    pickupCount = 0,
+    pickupTypeFor = null,
+  } = opts;
   const { grid } = world;
   grid.fill(0);
 
@@ -253,10 +268,13 @@ export function generateCity(world, opts = {}) {
   // Scale cluster and loose-block counts with map area so larger levels feel equally dense.
   const areaScale = (W * L) / (40 * 40);
   const clusterCount = Math.round((14 + Math.floor(Math.random() * 9)) * areaScale);
+  // Verticality cap: clamps cluster height. At verticality=0 (L0) all clusters
+  // are 1 high; at 1.0 (L4+) the original 1–3 range applies.
+  const maxClusterH = Math.max(1, Math.round(1 + 2 * verticality));
   for (let c = 0; c < clusterCount; c++) {
     const fw = 2 + Math.floor(Math.random() * 4); // footprint width
     const fl = 2 + Math.floor(Math.random() * 4);
-    const fh = 1 + Math.floor(Math.random() * 3); // height in cubes (max 3 — keep city low)
+    const fh = 1 + Math.floor(Math.random() * maxClusterH); // bounded by verticality
     const cx = 3 + Math.floor(Math.random() * (W - 6 - fw));
     const cy = 3 + Math.floor(Math.random() * (L - 6 - fl));
 
@@ -288,8 +306,9 @@ export function generateCity(world, opts = {}) {
 
   // --- Maze corridors (only on higher-maze-level runs) ---
   // Long 2-high wall segments create channels and funnel movement.
-  if (mazeLevel > 0) {
-    const corridorCount = Math.round(mazeLevel * 28 * areaScale);
+  // Multiplied by verticality so flat early levels skip them entirely.
+  if (mazeLevel > 0 && verticality > 0.25) {
+    const corridorCount = Math.round(mazeLevel * 28 * areaScale * verticality);
     for (let i = 0; i < corridorCount; i++) {
       const horiz = Math.random() < 0.5;
       const len = 5 + Math.floor(Math.random() * 9); // 5–13 tiles long
@@ -310,21 +329,31 @@ export function generateCity(world, opts = {}) {
 
   // --- Architectural set-pieces ---
   // Placed after clusters/corridors so they stamp clean geometry on top.
-  // Count scales gently with map area; more variety at higher maze levels.
+  // Count scales gently with map area; the type list is restricted by the
+  // level's `setPieces` whitelist, and heights are clamped by `setPieceMaxH`
+  // so early levels still get set-pieces but render flat.
   {
     const count = Math.round((5 + Math.floor(Math.random() * 5)) * Math.sqrt(areaScale));
     const r = () => Math.random();
+    const allowed = new Set(setPieces);
+    const pickKind = () => {
+      const order = ["arch", "bridge", "tower", "courtyard", "staircase", "lshape", "zigzag"];
+      const choices = order.filter(k => allowed.has(k));
+      return choices[Math.floor(r() * choices.length)] || "courtyard";
+    };
+    const cap = Math.max(1, setPieceMaxH);
+    const clampH = (h) => Math.min(h, cap);
     for (let i = 0; i < count; i++) {
       const fx = 5 + Math.floor(r() * (W - 14));
       const fy = 5 + Math.floor(r() * (L - 14));
-      const pick = Math.floor(r() * 7);
-      if      (pick === 0) spawnArch(world, fx, fy, r() < 0.5, 2 + (r() < 0.4 ? 1 : 0), 2);
-      else if (pick === 1) spawnBridge(world, fx, fy, r() < 0.5, 6 + Math.floor(r() * 5));
-      else if (pick === 2) spawnTower(world, fx, fy, 2 + (r() < 0.5 ? 1 : 0), 2 + Math.floor(r() * 2));
-      else if (pick === 3) spawnCourtyard(world, fx, fy, 5 + Math.floor(r() * 4));
-      else if (pick === 4) spawnStaircase(world, fx, fy, r() < 0.5, 3 + Math.floor(r() * 3));
-      else if (pick === 5) spawnLShape(world, fx, fy, 1 + Math.floor(r() * 2));
-      else                 spawnZigzag(world, fx, fy, r() < 0.5, 2 + Math.floor(r() * 3), 2);
+      const kind = pickKind();
+      if      (kind === "arch")      spawnArch(world, fx, fy, r() < 0.5, clampH(2 + (r() < 0.4 ? 1 : 0)), Math.min(2, cap));
+      else if (kind === "bridge")    spawnBridge(world, fx, fy, r() < 0.5, 6 + Math.floor(r() * 5));
+      else if (kind === "tower")     spawnTower(world, fx, fy, clampH(2 + (r() < 0.5 ? 1 : 0)), 2 + Math.floor(r() * 2));
+      else if (kind === "courtyard") spawnCourtyard(world, fx, fy, 5 + Math.floor(r() * 4));
+      else if (kind === "staircase") spawnStaircase(world, fx, fy, r() < 0.5, clampH(3 + Math.floor(r() * 3)));
+      else if (kind === "lshape")    spawnLShape(world, fx, fy, clampH(1 + Math.floor(r() * 2)));
+      else                           spawnZigzag(world, fx, fy, r() < 0.5, clampH(2 + Math.floor(r() * 3)), Math.min(2, cap));
     }
   }
 
@@ -387,7 +416,30 @@ export function generateCity(world, opts = {}) {
     }
   }
 
-  return { spawnPlayer, spawnHostage, gaps, nests };
+  // --- Pickups (after spawns are determined so we can keep distance). ---
+  const pickups = [];
+  if (pickupCount > 0 && pickupTypeFor) {
+    for (let i = 0; i < pickupCount; i++) {
+      let x, y, tries = 60;
+      do {
+        x = 4 + Math.floor(Math.random() * (W - 8));
+        y = 4 + Math.floor(Math.random() * (L - 8));
+        tries--;
+      } while (
+        tries > 0 && (
+          topAt(world, x, y) !== 0
+          || (Math.abs(x - spawnPlayer.x) + Math.abs(y - spawnPlayer.y)) < 4
+          || (spawnHostage && Math.abs(x - spawnHostage.x) + Math.abs(y - spawnHostage.y) < 2)
+          || pickups.some(p => p.x === x && p.y === y)
+        )
+      );
+      if (tries > 0) {
+        pickups.push({ x, y, z: 0, type: pickupTypeFor(i) });
+      }
+    }
+  }
+
+  return { spawnPlayer, spawnHostage, gaps, nests, pickups };
 }
 
 function inwardFromGap(g) {

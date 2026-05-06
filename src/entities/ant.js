@@ -10,10 +10,52 @@ function stepMsForDist(d) {
   return STEP_MS;
 }
 
-export function makeAnt(spawn) {
+// Three ant types, each with distinct stats:
+//   WORKER  — the basic ant. Default stats.
+//   SOLDIER — slower, takes 2 grenade hits to kill, larger sprite.
+//   SCOUT   — faster, fragile. 1 grenade kills it.
+//
+// `stepMul` multiplies the distance-derived step interval (1.0 = unchanged,
+// 1.4 = 40% slower, 0.7 = 30% faster).
+export const ANT_TYPES = {
+  WORKER:  { hp: 1, stepMul: 1.0,  biteDmg: 1, scale: 1.0 },
+  SOLDIER: { hp: 2, stepMul: 1.30, biteDmg: 1, scale: 1.4 },
+  SCOUT:   { hp: 1, stepMul: 0.65, biteDmg: 1, scale: 0.8 },
+};
+
+// Spawn-share table indexed by levelIdx (0..6).
+const TYPE_WEIGHTS = [
+  { WORKER: 100, SOLDIER:  0, SCOUT:  0 },  // L0
+  { WORKER: 100, SOLDIER:  0, SCOUT:  0 },  // L1
+  { WORKER:  80, SOLDIER: 20, SCOUT:  0 },  // L2
+  { WORKER:  70, SOLDIER: 30, SCOUT:  0 },  // L3
+  { WORKER:  60, SOLDIER: 25, SCOUT: 15 },  // L4
+  { WORKER:  50, SOLDIER: 30, SCOUT: 20 },  // L5
+  { WORKER:  40, SOLDIER: 35, SCOUT: 25 },  // L6
+];
+
+export function pickAntType(levelIdx) {
+  const table = TYPE_WEIGHTS[Math.max(0, Math.min(TYPE_WEIGHTS.length - 1, levelIdx))];
+  let total = 0;
+  for (const k in table) total += table[k];
+  let r = Math.random() * total;
+  for (const k in table) {
+    r -= table[k];
+    if (r <= 0) return k;
+  }
+  return "WORKER";
+}
+
+export function makeAnt(spawn, type = "WORKER") {
+  const t = ANT_TYPES[type] || ANT_TYPES.WORKER;
   return {
     kind: "ant",
     id: Math.random().toString(36).slice(2, 9),
+    type,
+    hp: t.hp,
+    stepMul: t.stepMul,
+    biteDmg: t.biteDmg,
+    scale: t.scale,
     x: spawn.x, y: spawn.y, z: spawn.z,
     tx: spawn.x, ty: spawn.y, tz: spawn.z,
     moveT: 0,
@@ -80,7 +122,7 @@ export function tickAnt(a, world, player, dtMs, pathFromPlayer, isOccupied = nul
   if (isOccupied && isOccupied(next.x, next.y, tz)) return; // tile taken
 
   const mdist = Math.abs(next.x - player.x) + Math.abs(next.y - player.y);
-  a._stepMs = stepMsForDist(mdist);
+  a._stepMs = Math.round(stepMsForDist(mdist) * a.stepMul);
   a.tx = next.x; a.ty = next.y; a.tz = tz;
   a.moveT = 0;
 }

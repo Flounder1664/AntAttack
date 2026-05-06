@@ -87,3 +87,20 @@ export function playDeath() {
 export function playTimerWarning() {
   osc(880, 0.09, 0.12, "square");
 }
+
+// Skill purchased — rising arpeggio chime.
+export function playPurchase() {
+  [523, 659, 784, 988].forEach((f, i) =>
+    setTimeout(() => osc(f, 0.18, 0.14, "sine"), i * 60));
+}
+
+// Shield activated / consumed — short metallic zap.
+export function playShield() {
+  osc(1200, 0.18, 0.16, "square", 600);
+}
+
+// Pickup ping — a softer two-note for routine pickups (coin, grenade, time).
+export function playPing() {
+  osc(880, 0.06, 0.10, "sine");
+  setTimeout(() => osc(1320, 0.10, 0.08, "sine"), 50);
+}

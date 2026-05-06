@@ -332,9 +332,15 @@ export function drawHumanoid(ctx, sx, sy, opts = {}) {
 
 // Ant: low, six-legged silhouette with two glowing eyes.
 // `legacy` switches to a chunky pixel-art rendering for the Spectrum theme.
+// `type` ("WORKER" | "SOLDIER" | "SCOUT") scales the sprite and applies a
+// distinguishing stripe (SOLDIER) or smaller silhouette (SCOUT).
 export function drawAnt(ctx, sx, sy, frame = 0, opts = {}) {
-  const { legacy = false } = opts;
+  const { legacy = false, type = "WORKER" } = opts;
   const p = palette();
+  const typeScale =
+    type === "SOLDIER" ? 1.4 :
+    type === "SCOUT"   ? 0.8 :
+    1.0;
 
   if (legacy) {
     // ── Pixel-art ant ─────────────────────────────────────────────────────
@@ -345,7 +351,7 @@ export function drawAnt(ctx, sx, sy, frame = 0, opts = {}) {
     //   neck    — 1u link
     //   head    — 3u rounded with red eyes and forked mandibles
     //   antennae— two elbowed segments rising and bending forward
-    const u = Math.max(2, Math.round(TILE_W / 30));
+    const u = Math.max(2, Math.round((TILE_W / 30) * typeScale));
     const bx = Math.round(sx / u) * u;
     const by = Math.round(sy / u) * u;
     const w = frame % 2;  // wiggle phase
@@ -402,10 +408,23 @@ export function drawAnt(ctx, sx, sy, frame = 0, opts = {}) {
     // Glowing red eyes on the head.
     ctx.fillStyle = p.antEye;
     ctx.fillRect(bx + 1 * u, by - 2 * u, 1 * u, 1 * u);
+
+    // SOLDIER — abdominal stripe so they're recognisably tougher.
+    if (type === "SOLDIER") {
+      ctx.fillStyle = p.antEye;
+      ctx.fillRect(bx - 8 * u, by - 3 * u, 2 * u, 1 * u);
+    }
     return;
   }
 
   // ── Smooth (non-legacy) mode ──────────────────────────────────────────
+  // typeScale resizes via context — wrap in save/scale/restore.
+  if (typeScale !== 1.0) {
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.scale(typeScale, typeScale);
+    ctx.translate(-sx, -sy);
+  }
   ctx.fillStyle = p.ant;
   // body: head, thorax, abdomen
   ctx.beginPath();
@@ -431,6 +450,8 @@ export function drawAnt(ctx, sx, sy, frame = 0, opts = {}) {
   ctx.fillStyle = p.antEye;
   ctx.fillRect(sx + 7, sy - 7, 1.5, 1.5);
   ctx.fillRect(sx + 4, sy - 7, 1.5, 1.5);
+
+  if (typeScale !== 1.0) ctx.restore();
 }
 
 // Small grenade.
@@ -442,6 +463,99 @@ export function drawGrenade(ctx, sx, sy) {
   ctx.fill();
   ctx.fillStyle = p.cubeOutline;
   ctx.fillRect(sx - 0.5, sy - 7, 1, 2);
+}
+
+// World pickup. Each type has a colour + glyph; we render a soft pulse
+// around the icon so the player can spot pickups across the map.
+// `phase` (0..1, looping) drives the pulse amplitude.
+export function drawPickup(ctx, sx, sy, type, phase = 0) {
+  const p = palette();
+  const u = Math.max(2, Math.round(TILE_W / 30));
+  const colors = {
+    HEALTH:  "#ff5577",
+    GRENADE: "#bbbb22",
+    COIN:    "#ffd14b",
+    GEM:     "#7df7ff",
+    SHIELD:  "#88ddff",
+    TIME:    "#dddddd",
+    MAP:     "#9affae",
+  };
+  const c = colors[type] || "#ffffff";
+  const cy = sy - u * 2; // hover slightly above ground
+
+  // Pulse halo
+  const pulse = 0.5 + 0.5 * Math.sin(phase * Math.PI * 2);
+  ctx.save();
+  ctx.globalAlpha = 0.18 + 0.18 * pulse;
+  ctx.fillStyle = c;
+  ctx.beginPath();
+  ctx.arc(sx, cy, u * (1.6 + 0.4 * pulse), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Outline / body
+  ctx.fillStyle = c;
+  ctx.strokeStyle = p.cubeOutline || "#000";
+  ctx.lineWidth = Math.max(1, u / 3);
+
+  // Type-specific glyph drawn from rectangles so it stays crisp at any scale.
+  if (type === "HEALTH") {
+    // red cross
+    ctx.fillRect(sx - u * 1.5, cy - u * 0.5, u * 3, u * 1);
+    ctx.fillRect(sx - u * 0.5, cy - u * 1.5, u * 1, u * 3);
+    ctx.strokeRect(sx - u * 1.5, cy - u * 0.5, u * 3, u * 1);
+    ctx.strokeRect(sx - u * 0.5, cy - u * 1.5, u * 1, u * 3);
+  } else if (type === "GRENADE") {
+    // small grenade-like circle with a stem
+    ctx.beginPath();
+    ctx.arc(sx, cy, u * 1.2, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = p.cubeOutline || "#000";
+    ctx.fillRect(sx - u * 0.3, cy - u * 1.8, u * 0.6, u * 0.6);
+  } else if (type === "COIN") {
+    ctx.beginPath();
+    ctx.arc(sx, cy, u * 1.0, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+  } else if (type === "GEM") {
+    // diamond
+    ctx.beginPath();
+    ctx.moveTo(sx,             cy - u * 1.4);
+    ctx.lineTo(sx + u * 1.0,   cy);
+    ctx.lineTo(sx,             cy + u * 1.4);
+    ctx.lineTo(sx - u * 1.0,   cy);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+  } else if (type === "SHIELD") {
+    // shield: ring + small bar
+    ctx.beginPath();
+    ctx.arc(sx, cy, u * 1.2, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillRect(sx - u * 0.5, cy - u * 0.2, u * 1.0, u * 0.4);
+  } else if (type === "TIME") {
+    // hourglass: two triangles meeting at the centre
+    ctx.beginPath();
+    ctx.moveTo(sx - u * 1.0, cy - u * 1.2);
+    ctx.lineTo(sx + u * 1.0, cy - u * 1.2);
+    ctx.lineTo(sx,           cy);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(sx - u * 1.0, cy + u * 1.2);
+    ctx.lineTo(sx + u * 1.0, cy + u * 1.2);
+    ctx.lineTo(sx,           cy);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+  } else if (type === "MAP") {
+    // folded map: rectangle with a fold line
+    ctx.fillRect(sx - u * 1.3, cy - u * 0.9, u * 2.6, u * 1.8);
+    ctx.strokeRect(sx - u * 1.3, cy - u * 0.9, u * 2.6, u * 1.8);
+    ctx.beginPath();
+    ctx.moveTo(sx - u * 0.4, cy - u * 0.9);
+    ctx.lineTo(sx - u * 0.4, cy + u * 0.9);
+    ctx.moveTo(sx + u * 0.5, cy - u * 0.9);
+    ctx.lineTo(sx + u * 0.5, cy + u * 0.9);
+    ctx.stroke();
+  }
 }
 
 // Flat ground rhombus — the top face of the ground plane at z=0.

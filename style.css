@@ -155,17 +155,20 @@ kbd {
 }
 
 #achievements-list {
-  max-width: 520px;
+  max-width: 1080px;
+  width: 90vw;
   margin-top: 0.5rem;
+  max-height: 30vh;
+  overflow-y: auto;
 }
 #achievements-list ul {
   list-style: none;
   padding: 0;
   margin: 0;
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.25rem 1rem;
-  font-size: 0.78rem;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.2rem 1rem;
+  font-size: 0.72rem;
   text-align: left;
 }
 #achievements-list li { opacity: 0.4; }
@@ -236,3 +239,94 @@ kbd {
 
 #endscreen #end-title.lose { color: var(--danger); text-shadow: 0 0 18px currentColor; }
 #end-achievements { list-style: none; padding: 0; color: var(--accent); }
+#end-achievements li.ach-head {
+  color: var(--warn);
+  font-weight: bold;
+  margin-bottom: 0.4rem;
+  letter-spacing: 0.15rem;
+}
+#end-achievements li.ach-currency {
+  color: var(--fg);
+  opacity: 0.85;
+  font-size: 0.85rem;
+}
+
+/* ── Currency badge in HUD ─────────────────────────────────────────────── */
+#currency {
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  padding: 0.4rem 0.8rem;
+  letter-spacing: 0.15rem;
+  color: var(--warn);
+}
+
+/* Shielded health pips get a glowing ring around the row. */
+#health.shielded {
+  outline: 2px solid color-mix(in srgb, #88ddff 80%, transparent);
+  outline-offset: 4px;
+  box-shadow: 0 0 12px color-mix(in srgb, #88ddff 70%, transparent);
+}
+
+/* ── Title-screen currency badge ──────────────────────────────────────── */
+.currency-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.7rem;
+  border: 1px solid var(--panel-edge);
+  color: var(--warn);
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+}
+
+/* ── Skill tree on title screen ───────────────────────────────────────── */
+.skills-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  gap: 0.4rem;
+  max-width: 540px;
+}
+.skill-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+.skill-col h4 {
+  margin: 0 0 0.2rem;
+  text-align: center;
+  font-size: 0.7rem;
+  letter-spacing: 0.2rem;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+.skill-cell {
+  background: transparent;
+  border: 1px solid var(--panel-edge);
+  color: var(--fg);
+  padding: 0.4rem 0.5rem;
+  font-family: inherit;
+  font-size: 0.65rem;
+  text-align: left;
+  letter-spacing: 0.05rem;
+  text-transform: none;
+  cursor: pointer;
+  line-height: 1.35;
+}
+.skill-cell b { color: var(--accent); }
+.skill-cell small { display: block; opacity: 0.78; margin-top: 0.15rem; }
+.skill-cell span { display: block; margin-top: 0.25rem; color: var(--warn); }
+.skill-cell.skill-owned {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  border-color: var(--accent);
+  color: var(--accent);
+  cursor: default;
+}
+.skill-cell.skill-owned span { color: var(--accent); }
+.skill-cell.skill-locked,
+.skill-cell.skill-unaffordable {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.skill-cell.skill-available:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: var(--accent);
+}
