@@ -99,35 +99,38 @@ export function drawCube(ctx, rx, ry, z, kind = "block", opts = {}) {
   // slightly darker at the ground, so stacked structures gain visible
   // tier-to-tier contrast without abandoning the uniform Spectrum white.
   // Centred around z=1 so the visual change is balanced (no overall shift).
-  //   z=0 → -4% (faint dark overlay)
-  //   z=1 →  0%  (unchanged)
-  //   z=2 → +4% (faint white overlay)
-  //   z=3 → +8%
-  //   z≥4 → +12% (capped)
-  const zStep = 0.04;
+  // The tint is applied BEFORE the stipple (so base lightness shifts and
+  // the stipple texture sits on top), which makes the change much more
+  // visible than tinting the final composited surface.
+  //   z=0 → -6%
+  //   z=1 →  0%
+  //   z=2 → +6%
+  //   z=3 → +12%
+  //   z≥4 → +18% (capped)
+  const zStep = 0.06;
   const zTint = Math.max(-zStep, Math.min(zStep * 3, (z - 1) * zStep));
 
-  // Helper: fill a path, then optionally overlay stipple, shadow tint, and
-  // the per-z brightness tint. The z tint is applied last so it modulates
-  // the final colour, not just the base fill.
+  // Helper: fill a path with the base colour, apply the z brightness tint
+  // (so the base shifts), then overlay stipple texture and any shadow tint
+  // on top of the modulated base.
   const fillFace = (path, color, stippleKey, shadowTint = false) => {
     ctx.beginPath();
     path();
     ctx.closePath();
     ctx.fillStyle = color;
     ctx.fill();
+    if (zTint !== 0) {
+      ctx.fillStyle = zTint > 0
+        ? `rgba(255,255,255,${zTint})`
+        : `rgba(0,0,0,${-zTint})`;
+      ctx.fill();
+    }
     if (stippleKey && pats) {
       ctx.fillStyle = pats[stippleKey];
       ctx.fill();
     }
     if (shadowTint) {
       ctx.fillStyle = "rgba(0,0,0,0.30)";
-      ctx.fill();
-    }
-    if (zTint !== 0) {
-      ctx.fillStyle = zTint > 0
-        ? `rgba(255,255,255,${zTint})`
-        : `rgba(0,0,0,${-zTint})`;
       ctx.fill();
     }
   };
