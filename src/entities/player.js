@@ -1,6 +1,6 @@
 import { feetAt, get, W, L } from "../world.js";
 
-const BASE_STEP_MS = 130;
+const BASE_STEP_MS = 160;
 
 export function makePlayer(spawn, character = "boy", opts = {}) {
   const {

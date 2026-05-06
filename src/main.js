@@ -526,7 +526,10 @@ function grappleStep() {
 }
 
 function toggleMap() {
-  if (!player.mapVision) return;
+  if (!player.mapVision) {
+    toast("Map Vision locked — buy in Explorer tier 5");
+    return;
+  }
   player.mapVisionOn = !player.mapVisionOn;
 }
 
@@ -980,7 +983,7 @@ function render() {
 
   // Minimap (Map Vision skill — Tab toggles it).
   if (player && player.mapVisionOn) {
-    const cellSize = Math.max(2, Math.floor(160 / Math.max(W, L)));
+    const cellSize = Math.max(3, Math.floor(280 / Math.max(W, L)));
     const mw = W * cellSize, mh = L * cellSize;
     const mx = cw - mw - 16, my = 16;
     ctx.save();
