@@ -142,6 +142,7 @@ let runEarned = [];          // achievements earned this run, for endscreen
 let runSpec = null;           // skill-applied options snapshot for the current run
 let runCurrency = 0;          // currency earned this run (will be added to lifetime on endRun)
 let runBreakdown = null;      // [["kills", n], ["pickups", n], ...] for endscreen
+let _carryHealth = null;      // health at end of last won level — carried into the next level
 let runState = {              // run-scoped extras pickups read/write
   timerBonus: 0,              // TIME pickup: seconds added to timerSec
   mapRevealMs: 0,             // MAP pickup: how long the world is "lit" by the reveal
@@ -279,9 +280,21 @@ function startRun(levelIdx = 0) {
 
   // Compute the run spec from skills (mutates a fresh opts object).
   runSpec = skills.buildSpec(cfg);
-  // Apply the heal-on-start bonus.
-  if (runSpec.healOnStart > 0) {
-    runSpec.health = Math.min(runSpec.maxHealth, runSpec.health + runSpec.healOnStart);
+
+  // Determine starting health for this level.
+  //   Fresh run (level 0, or no carry from a prior win): start at full
+  //     spec health, plus the Field Medic bonus on top (capped at max).
+  //   Continuing run (level N>0 after winning N-1): carry health from
+  //     the previous level and apply the Field Medic bonus on top.
+  // This makes Field Medic genuinely useful: on level 1 you start full so
+  // the +1 is wasted, but on every subsequent level it tops up your
+  // carried-over health by 1.
+  let startHealth;
+  if (levelIdx === 0 || _carryHealth === null) {
+    startHealth = Math.min(runSpec.maxHealth, runSpec.health + runSpec.healOnStart);
+    _carryHealth = null;
+  } else {
+    startHealth = Math.min(runSpec.maxHealth, _carryHealth + runSpec.healOnStart);
   }
 
   world = makeWorld();
@@ -300,7 +313,7 @@ function startRun(levelIdx = 0) {
   pickups = (gen.pickups || []).map(p => makePickup({ x: p.x, y: p.y, z: p.z }, p.type));
 
   player = makePlayer(spawnPlayer, selectedChar(), {
-    health: runSpec.health,
+    health: startHealth,
     maxHealth: runSpec.maxHealth,
     grenades: runSpec.grenades + (runSpec.grenadeStart || 0),
     mines: runSpec.mineStart || 0,
@@ -376,6 +389,8 @@ function endRun(won) {
   setInputEnabled(false);
   hideHud();
   if (won) playWin(); else playDeath();
+  // Carry remaining health into the next level if we won; clear if dead.
+  _carryHealth = won ? player.health : null;
 
   // 1. Emit run-end events FIRST so style achievements (untouched, pacifist,
   //    speedrun, all_levels, last_second, etc.) populate `runEarned` before
@@ -564,6 +579,7 @@ document.getElementById("quit").addEventListener("click", () => {
   hideOverlay("pause");
   hideHud();
   world = null;
+  _carryHealth = null;        // returning to title — next run is fresh
   showOverlay("title");
   refreshThemePicker();
   refreshAchievementList();
@@ -1060,6 +1076,7 @@ function boot() {
   document.getElementById("start").addEventListener("click", () => startRun(0));
   document.getElementById("again").addEventListener("click", () => {
     hideOverlay("endscreen");
+    _carryHealth = null;        // back to title — next run is fresh
     showOverlay("title");
     refreshThemePicker();
     refreshAchievementList();
