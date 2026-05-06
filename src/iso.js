@@ -95,7 +95,21 @@ export function drawCube(ctx, rx, ry, z, kind = "block", opts = {}) {
   const hw = TILE_W / 2;
   const hh = TILE_H / 2;
 
-  // Helper: fill a path, then optionally overlay stipple and/or a shadow tint.
+  // Per-z brightness modulation — slightly brighter at higher levels and
+  // slightly darker at the ground, so stacked structures gain visible
+  // tier-to-tier contrast without abandoning the uniform Spectrum white.
+  // Centred around z=1 so the visual change is balanced (no overall shift).
+  //   z=0 → -3.5% (faint dark overlay)
+  //   z=1 →  0%   (unchanged)
+  //   z=2 → +3.5% (faint white overlay)
+  //   z=3 → +7%
+  //   z≥4 → +10.5% (capped)
+  const zStep = 0.035;
+  const zTint = Math.max(-zStep, Math.min(zStep * 3, (z - 1) * zStep));
+
+  // Helper: fill a path, then optionally overlay stipple, shadow tint, and
+  // the per-z brightness tint. The z tint is applied last so it modulates
+  // the final colour, not just the base fill.
   const fillFace = (path, color, stippleKey, shadowTint = false) => {
     ctx.beginPath();
     path();
@@ -108,6 +122,12 @@ export function drawCube(ctx, rx, ry, z, kind = "block", opts = {}) {
     }
     if (shadowTint) {
       ctx.fillStyle = "rgba(0,0,0,0.30)";
+      ctx.fill();
+    }
+    if (zTint !== 0) {
+      ctx.fillStyle = zTint > 0
+        ? `rgba(255,255,255,${zTint})`
+        : `rgba(0,0,0,${-zTint})`;
       ctx.fill();
     }
   };
