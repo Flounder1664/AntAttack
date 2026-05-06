@@ -99,13 +99,13 @@ export function drawCube(ctx, rx, ry, z, kind = "block", opts = {}) {
   // alpha decreases with z. A white→white "brightening" overlay does nothing
   // (you can't brighten pure white), so we instead darken the lower tiers
   // and let higher tiers appear bright by comparison.
-  //   z=0 → 16% black overlay (visibly darker)
-  //   z=1 → 12%
-  //   z=2 →  8%
-  //   z=3 →  4%
+  //   z=0 → 24% black overlay (clearly darker)
+  //   z=1 → 18%
+  //   z=2 → 12%
+  //   z=3 →  6%
   //   z≥4 →  0% (full base brightness)
-  const baseDarken = 0.16;
-  const zStep = 0.04;
+  const baseDarken = 0.24;
+  const zStep = 0.06;
   const zDarken = Math.max(0, baseDarken - z * zStep);
 
   // Helper: fill a path with the base colour, apply the z darkening tint
